@@ -1,4 +1,4 @@
-// Pokémon-style game with real high-quality official artwork
+// Pokémon-style game with embedded official Pokemon images
 
 const TYPES = {
   fire: { weak: ['water', 'rock', 'ground'], strong: ['grass', 'bug', 'ice', 'steel'], color: '#FF6B35' },
@@ -32,75 +32,38 @@ const pokemonBase = [
   { id: 102, name: 'Exeggcute', type: 'grass', hp: 60, atk: 40, def: 80, spa: 60, spd: 85, spe: 40, catchRate: 190, color: '#A8B820' }
 ];
 
-// CORS-friendly image sources - use data URLs and base64 encoded images
-const pokemonImages = {
-  1: 'https://unpkg.com/pokemon@1.0.0/sprites/official/official_artwork/1.png',
-  4: 'https://unpkg.com/pokemon@1.0.0/sprites/official/official_artwork/4.png',
-  7: 'https://unpkg.com/pokemon@1.0.0/sprites/official/official_artwork/7.png',
-  25: 'https://unpkg.com/pokemon@1.0.0/sprites/official/official_artwork/25.png',
-  58: 'https://unpkg.com/pokemon@1.0.0/sprites/official/official_artwork/58.png',
-  63: 'https://unpkg.com/pokemon@1.0.0/sprites/official/official_artwork/63.png',
-  69: 'https://unpkg.com/pokemon@1.0.0/sprites/official/official_artwork/69.png',
-  133: 'https://unpkg.com/pokemon@1.0.0/sprites/official/official_artwork/133.png',
-  95: 'https://unpkg.com/pokemon@1.0.0/sprites/official/official_artwork/95.png',
-  102: 'https://unpkg.com/pokemon@1.0.0/sprites/official/official_artwork/102.png'
+// Direct CDN URLs - fastest and most reliable
+const pokemonUrls = {
+  1: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/1.png',
+  4: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/4.png',
+  7: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/7.png',
+  25: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/25.png',
+  58: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/58.png',
+  63: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/63.png',
+  69: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/69.png',
+  133: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/133.png',
+  95: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/95.png',
+  102: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/102.png'
 };
 
 const spriteCache = {};
-let animationId = null;
 
-function createPlaceholderImage(id) {
-  const base = pokemonBase.find(p => p.id === id) || { color: '#777', name: '#' + id };
-  const color = base.color || '#777';
-  const name = (base.name || ('#' + id)).substring(0, 10);
-  
-  // Create canvas-based placeholder
-  const canvas = document.createElement('canvas');
-  canvas.width = 200;
-  canvas.height = 200;
-  const ctx = canvas.getContext('2d');
-  
-  // Draw colored background
-  ctx.fillStyle = color;
-  ctx.fillRect(0, 0, 200, 200);
-  
-  // Draw text
-  ctx.fillStyle = '#FFF';
-  ctx.font = 'bold 20px Arial';
-  ctx.textAlign = 'center';
-  ctx.fillText(name, 100, 110);
-  
-  const img = new Image();
-  img.src = canvas.toDataURL();
-  img.isPlaceholder = true;
-  img.loaded = true;
-  return img;
-}
-
-// Preload and cache Pokemon images immediately
-function preloadPokemonImages() {
-  pokemonBase.forEach(pok => {
-    const url = pokemonImages[pok.id];
-    if (url) {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.onload = () => {
-        img.loaded = true;
-        spriteCache[pok.id] = img;
-        console.log(`✅ Cached #${pok.id} - ${pok.name}`);
-      };
-      img.onerror = () => {
-        console.warn(`⚠️ Failed to load #${pok.id}, using placeholder`);
-        spriteCache[pok.id] = createPlaceholderImage(pok.id);
-      };
-      img.src = url;
-    }
+// Fast image preloader - no placeholders
+function preloadAllPokemon() {
+  Object.keys(pokemonUrls).forEach(id => {
+    const img = new Image();
+    img.src = pokemonUrls[id];
+    img.onload = () => {
+      spriteCache[id] = img;
+      console.log(`✅ #${id} ready`);
+      if (gameState && gameState.gameMode === 'battle') drawBattle();
+    };
+    img.onerror = () => console.warn(`⚠️ #${id} failed`);
   });
 }
 
 function getSpriteImage(id) {
-  if (spriteCache[id]) return spriteCache[id];
-  return createPlaceholderImage(id);
+  return spriteCache[id] || null;
 }
 
 let gameState = {
@@ -281,8 +244,8 @@ async function loadGame() {
     console.error('Load error:', error);
   }
 
-  // Preload images in background
-  preloadPokemonImages();
+  // Start preloading Pokemon immediately
+  preloadAllPokemon();
 
   if (gameState.team.length === 0) startPokemonSelection(); else startExploration();
 }
@@ -365,19 +328,15 @@ function drawBattle() {
   ctx.fillStyle = '#A8D8A8'; ctx.fillRect(0, 0, canvas.width, 160);
   ctx.fillStyle = '#D4C9A8'; ctx.fillRect(180, 20, 120, 100); ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.strokeRect(180, 20, 120, 100);
 
-  // Enemy sprite - draw actual image if available
+  // Enemy sprite - draw Pokemon directly
   const enemySprite = getSpriteImage(enemy.id);
-  if (enemySprite && enemySprite.loaded) {
+  if (enemySprite) {
     try { 
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(enemySprite, 180, 20, 120, 120); 
     } catch (e) { 
-      ctx.fillStyle = enemy.color; 
-      ctx.fillRect(220, 50, 60, 60); 
+      console.error('Enemy draw error:', e);
     }
-  } else { 
-    ctx.fillStyle = enemy.color; 
-    ctx.fillRect(220, 50, 60, 60);
   }
 
   ctx.fillStyle = '#F8F8D8'; ctx.fillRect(10, 20, 160, 60); ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.strokeRect(10, 20, 160, 60);
@@ -387,17 +346,13 @@ function drawBattle() {
 
   // Player sprite
   const playerSprite = getSpriteImage(player.id);
-  if (playerSprite && playerSprite.loaded) {
+  if (playerSprite) {
     try { 
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(playerSprite, 20, 150, 120, 120); 
     } catch (e) { 
-      ctx.fillStyle = player.color; 
-      ctx.fillRect(60, 205, 60, 60); 
+      console.error('Player draw error:', e);
     }
-  } else { 
-    ctx.fillStyle = player.color; 
-    ctx.fillRect(60, 205, 60, 60);
   }
 
   ctx.fillStyle = '#F8F8D8'; ctx.fillRect(150, 170, 160, 100); ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.strokeRect(150, 170, 160, 100);
