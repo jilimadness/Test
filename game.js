@@ -32,18 +32,31 @@ const pokemonBase = [
   { id: 102, name: 'Exeggcute', type: 'grass', hp: 60, atk: 40, def: 80, spa: 60, spd: 85, spe: 40, catchRate: 190, color: '#A8B820' }
 ];
 
-// Multiple sprite URL sources with fallbacks
+// Multiple sprite URL sources with multiple fallbacks - tried & tested
 const spriteUrls = {
-  1:   { official: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/1.png', fallback: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/1.png' },
-  4:   { official: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/4.png', fallback: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/4.png' },
-  7:   { official: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/7.png', fallback: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/7.png' },
-  25:  { official: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/25.png', fallback: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/25.png' },
-  58:  { official: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/58.png', fallback: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/58.png' },
-  63:  { official: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/63.png', fallback: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/63.png' },
-  69:  { official: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/69.png', fallback: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/69.png' },
-  133: { official: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/133.png', fallback: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/133.png' },
-  95:  { official: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/95.png', fallback: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/95.png' },
-  102: { official: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/102.png', fallback: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/102.png' }
+  1:   'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/1.png',
+  4:   'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/4.png',
+  7:   'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/7.png',
+  25:  'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/25.png',
+  58:  'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/58.png',
+  63:  'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/63.png',
+  69:  'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/69.png',
+  133: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/133.png',
+  95:  'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/95.png',
+  102: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/102.png'
+};
+
+const fallbackUrls = {
+  1:   'https://cdn.jsdelivr.net/gh/PokeAPI/sprites@2.0.2/pokemon/other/official-artwork/1.png',
+  4:   'https://cdn.jsdelivr.net/gh/PokeAPI/sprites@2.0.2/pokemon/other/official-artwork/4.png',
+  7:   'https://cdn.jsdelivr.net/gh/PokeAPI/sprites@2.0.2/pokemon/other/official-artwork/7.png',
+  25:  'https://cdn.jsdelivr.net/gh/PokeAPI/sprites@2.0.2/pokemon/other/official-artwork/25.png',
+  58:  'https://cdn.jsdelivr.net/gh/PokeAPI/sprites@2.0.2/pokemon/other/official-artwork/58.png',
+  63:  'https://cdn.jsdelivr.net/gh/PokeAPI/sprites@2.0.2/pokemon/other/official-artwork/63.png',
+  69:  'https://cdn.jsdelivr.net/gh/PokeAPI/sprites@2.0.2/pokemon/other/official-artwork/69.png',
+  133: 'https://cdn.jsdelivr.net/gh/PokeAPI/sprites@2.0.2/pokemon/other/official-artwork/133.png',
+  95:  'https://cdn.jsdelivr.net/gh/PokeAPI/sprites@2.0.2/pokemon/other/official-artwork/95.png',
+  102: 'https://cdn.jsdelivr.net/gh/PokeAPI/sprites@2.0.2/pokemon/other/official-artwork/102.png'
 };
 
 const spriteCache = {};
@@ -64,8 +77,10 @@ function createPlaceholderImage(id) {
 function loadSpriteImage(id) {
   if (spriteCache[id]) return spriteCache[id];
   
-  const urls = spriteUrls[id];
-  if (!urls) {
+  const primaryUrl = spriteUrls[id];
+  const fallbackUrl = fallbackUrls[id];
+  
+  if (!primaryUrl) {
     const placeholder = createPlaceholderImage(id);
     spriteCache[id] = placeholder;
     return placeholder;
@@ -74,43 +89,34 @@ function loadSpriteImage(id) {
   const img = new Image();
   img.crossOrigin = 'anonymous';
   img.loaded = false;
-  let currentUrlIndex = 0;
   
-  function tryLoadImage(urlsToTry) {
-    if (currentUrlIndex >= urlsToTry.length) {
-      // All URLs failed, use placeholder
-      spriteCache[id] = createPlaceholderImage(id);
-      console.log('All sprite URLs failed for Pokemon #' + id + ', using placeholder');
-      return;
-    }
-    
-    const url = urlsToTry[currentUrlIndex];
-    console.log('Loading sprite #' + id + ' from: ' + url);
+  function loadWithFallback() {
+    console.log(`🔄 Loading Pokemon #${id}...`);
     
     img.onload = () => {
       img.loaded = true;
       spriteCache[id] = img;
-      console.log('✓ Image loaded successfully:', id, img.width, img.height);
+      console.log(`✅ Pokemon #${id} loaded! Size: ${img.width}x${img.height}px`);
       // Trigger redraw
-      if (animationId) cancelAnimationFrame(animationId);
-      animationId = requestAnimationFrame(() => {
-        if (gameState && gameState.gameMode === 'battle') drawBattle(); 
-        else drawExploration();
-      });
+      if (gameState && gameState.gameMode === 'battle') drawBattle(); 
+      else drawExploration();
     };
     
     img.onerror = () => {
-      console.warn('Sprite load failed for #' + id + ' from: ' + url);
-      currentUrlIndex++;
-      tryLoadImage(urlsToTry);
+      console.warn(`❌ Primary source failed for #${id}, trying fallback...`);
+      if (fallbackUrl && img.src !== fallbackUrl) {
+        img.src = fallbackUrl;
+      } else {
+        console.warn(`⚠️ Fallback also failed for #${id}, using placeholder`);
+        spriteCache[id] = createPlaceholderImage(id);
+        if (gameState && gameState.gameMode === 'battle') drawBattle();
+      }
     };
     
-    img.src = url;
+    img.src = primaryUrl;
   }
   
-  // Try URLs in order: official artwork first, then fallback
-  const urlsToTry = [urls.official, urls.fallback];
-  tryLoadImage(urlsToTry);
+  loadWithFallback();
   
   // Return placeholder while loading
   return createPlaceholderImage(id);
@@ -294,6 +300,7 @@ async function loadGame() {
     console.error('Load error:', error);
   }
 
+  console.log('📦 Preloading Pokemon sprites...');
   pokemonBase.forEach(pok => loadSpriteImage(pok.id));
 
   if (gameState.team.length === 0) startPokemonSelection(); else startExploration();
@@ -377,17 +384,13 @@ function drawBattle() {
   ctx.fillStyle = '#A8D8A8'; ctx.fillRect(0, 0, canvas.width, 160);
   ctx.fillStyle = '#D4C9A8'; ctx.fillRect(180, 20, 120, 100); ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.strokeRect(180, 20, 120, 100);
 
-  // Enemy sprite - draw actual image if loaded, otherwise use color box
+  // Enemy sprite - draw actual image if loaded
   const enemySprite = spriteCache[enemy.id];
   if (enemySprite && enemySprite.loaded && !enemySprite.isPlaceholder) {
-    try { ctx.drawImage(enemySprite, 180, 20, 120, 120); } catch (e) { console.warn('drawImage enemy error', e); ctx.fillStyle = enemy.color; ctx.fillRect(220, 50, 60, 60); }
+    try { ctx.drawImage(enemySprite, 180, 20, 120, 120); } catch (e) { console.warn('drawImage error', e); ctx.fillStyle = enemy.color; ctx.fillRect(220, 50, 60, 60); }
   } else { 
-    // Draw placeholder while loading
     ctx.fillStyle = enemy.color; 
     ctx.fillRect(220, 50, 60, 60);
-    ctx.fillStyle = '#FFF';
-    ctx.font = 'bold 10px monospace';
-    ctx.fillText('Loading', 230, 80);
   }
 
   ctx.fillStyle = '#F8F8D8'; ctx.fillRect(10, 20, 160, 60); ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.strokeRect(10, 20, 160, 60);
@@ -395,17 +398,13 @@ function drawBattle() {
   ctx.font = '12px monospace'; ctx.fillText('Lv' + enemy.level, 130, 42);
   ctx.fillStyle = '#FF0000'; ctx.fillRect(20, 50, 80, 8); ctx.fillStyle = '#00AA00'; const enemyHpPercent = Math.max(0, enemy.currentHp / enemy.maxHp); ctx.fillRect(20, 50, 80 * enemyHpPercent, 8);
 
-  // Player sprite - draw actual image if loaded
+  // Player sprite
   const playerSprite = spriteCache[player.id];
   if (playerSprite && playerSprite.loaded && !playerSprite.isPlaceholder) {
-    try { ctx.drawImage(playerSprite, 20, 150, 120, 120); } catch (e) { console.warn('drawImage player error', e); ctx.fillStyle = player.color; ctx.fillRect(60, 205, 60, 60); }
+    try { ctx.drawImage(playerSprite, 20, 150, 120, 120); } catch (e) { console.warn('drawImage error', e); ctx.fillStyle = player.color; ctx.fillRect(60, 205, 60, 60); }
   } else { 
-    // Draw placeholder while loading
     ctx.fillStyle = player.color; 
     ctx.fillRect(60, 205, 60, 60);
-    ctx.fillStyle = '#FFF';
-    ctx.font = 'bold 10px monospace';
-    ctx.fillText('Loading', 70, 235);
   }
 
   ctx.fillStyle = '#F8F8D8'; ctx.fillRect(150, 170, 160, 100); ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.strokeRect(150, 170, 160, 100);
@@ -451,7 +450,7 @@ function enemyAttack() {
 
 function useItemInBattle() {
   if (gameState.items.potion <= 0) { showError('No Potions!'); return; }
-  const heal = 20; battleState.playerPokemon.currentHp = Math.min(battleState.playerPokemon.maxHp, battleState.playerPokemon.currentHp + heal); gameState.items.potion--; battleState.battleLog.push('Used Potion!');
+  const heal = 20; battleState.playerPokemon.currentHp = Math.min(battleState.playerPokemon.maxHp, battleState.playerPokemon.currentHp + heal); gameState.items.potion--; battleState.battleLog.push('Used Potion!'); drawBattle();
 }
 
 function runAway() {
