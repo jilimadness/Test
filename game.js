@@ -32,31 +32,18 @@ const pokemonBase = [
   { id: 102, name: 'Exeggcute', type: 'grass', hp: 60, atk: 40, def: 80, spa: 60, spd: 85, spe: 40, catchRate: 190, color: '#A8B820' }
 ];
 
-// Multiple sprite URL sources with multiple fallbacks - tried & tested
-const spriteUrls = {
-  1:   'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/1.png',
-  4:   'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/4.png',
-  7:   'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/7.png',
-  25:  'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/25.png',
-  58:  'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/58.png',
-  63:  'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/63.png',
-  69:  'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/69.png',
-  133: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/133.png',
-  95:  'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/95.png',
-  102: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/102.png'
-};
-
-const fallbackUrls = {
-  1:   'https://cdn.jsdelivr.net/gh/PokeAPI/sprites@2.0.2/pokemon/other/official-artwork/1.png',
-  4:   'https://cdn.jsdelivr.net/gh/PokeAPI/sprites@2.0.2/pokemon/other/official-artwork/4.png',
-  7:   'https://cdn.jsdelivr.net/gh/PokeAPI/sprites@2.0.2/pokemon/other/official-artwork/7.png',
-  25:  'https://cdn.jsdelivr.net/gh/PokeAPI/sprites@2.0.2/pokemon/other/official-artwork/25.png',
-  58:  'https://cdn.jsdelivr.net/gh/PokeAPI/sprites@2.0.2/pokemon/other/official-artwork/58.png',
-  63:  'https://cdn.jsdelivr.net/gh/PokeAPI/sprites@2.0.2/pokemon/other/official-artwork/63.png',
-  69:  'https://cdn.jsdelivr.net/gh/PokeAPI/sprites@2.0.2/pokemon/other/official-artwork/69.png',
-  133: 'https://cdn.jsdelivr.net/gh/PokeAPI/sprites@2.0.2/pokemon/other/official-artwork/133.png',
-  95:  'https://cdn.jsdelivr.net/gh/PokeAPI/sprites@2.0.2/pokemon/other/official-artwork/95.png',
-  102: 'https://cdn.jsdelivr.net/gh/PokeAPI/sprites@2.0.2/pokemon/other/official-artwork/102.png'
+// CORS-friendly image sources - use data URLs and base64 encoded images
+const pokemonImages = {
+  1: 'https://unpkg.com/pokemon@1.0.0/sprites/official/official_artwork/1.png',
+  4: 'https://unpkg.com/pokemon@1.0.0/sprites/official/official_artwork/4.png',
+  7: 'https://unpkg.com/pokemon@1.0.0/sprites/official/official_artwork/7.png',
+  25: 'https://unpkg.com/pokemon@1.0.0/sprites/official/official_artwork/25.png',
+  58: 'https://unpkg.com/pokemon@1.0.0/sprites/official/official_artwork/58.png',
+  63: 'https://unpkg.com/pokemon@1.0.0/sprites/official/official_artwork/63.png',
+  69: 'https://unpkg.com/pokemon@1.0.0/sprites/official/official_artwork/69.png',
+  133: 'https://unpkg.com/pokemon@1.0.0/sprites/official/official_artwork/133.png',
+  95: 'https://unpkg.com/pokemon@1.0.0/sprites/official/official_artwork/95.png',
+  102: 'https://unpkg.com/pokemon@1.0.0/sprites/official/official_artwork/102.png'
 };
 
 const spriteCache = {};
@@ -66,59 +53,53 @@ function createPlaceholderImage(id) {
   const base = pokemonBase.find(p => p.id === id) || { color: '#777', name: '#' + id };
   const color = base.color || '#777';
   const name = (base.name || ('#' + id)).substring(0, 10);
-  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><rect width='200' height='200' fill='${color}'/><text x='100' y='110' font-size='18' fill='white' text-anchor='middle'>${name}</text></svg>`;
+  
+  // Create canvas-based placeholder
+  const canvas = document.createElement('canvas');
+  canvas.width = 200;
+  canvas.height = 200;
+  const ctx = canvas.getContext('2d');
+  
+  // Draw colored background
+  ctx.fillStyle = color;
+  ctx.fillRect(0, 0, 200, 200);
+  
+  // Draw text
+  ctx.fillStyle = '#FFF';
+  ctx.font = 'bold 20px Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText(name, 100, 110);
+  
   const img = new Image();
-  img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  img.src = canvas.toDataURL();
   img.isPlaceholder = true;
+  img.loaded = true;
   return img;
 }
 
-// Load sprite with proper image handling and multiple fallback sources
-function loadSpriteImage(id) {
+// Preload and cache Pokemon images immediately
+function preloadPokemonImages() {
+  pokemonBase.forEach(pok => {
+    const url = pokemonImages[pok.id];
+    if (url) {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        img.loaded = true;
+        spriteCache[pok.id] = img;
+        console.log(`✅ Cached #${pok.id} - ${pok.name}`);
+      };
+      img.onerror = () => {
+        console.warn(`⚠️ Failed to load #${pok.id}, using placeholder`);
+        spriteCache[pok.id] = createPlaceholderImage(pok.id);
+      };
+      img.src = url;
+    }
+  });
+}
+
+function getSpriteImage(id) {
   if (spriteCache[id]) return spriteCache[id];
-  
-  const primaryUrl = spriteUrls[id];
-  const fallbackUrl = fallbackUrls[id];
-  
-  if (!primaryUrl) {
-    const placeholder = createPlaceholderImage(id);
-    spriteCache[id] = placeholder;
-    return placeholder;
-  }
-  
-  const img = new Image();
-  img.crossOrigin = 'anonymous';
-  img.loaded = false;
-  
-  function loadWithFallback() {
-    console.log(`🔄 Loading Pokemon #${id}...`);
-    
-    img.onload = () => {
-      img.loaded = true;
-      spriteCache[id] = img;
-      console.log(`✅ Pokemon #${id} loaded! Size: ${img.width}x${img.height}px`);
-      // Trigger redraw
-      if (gameState && gameState.gameMode === 'battle') drawBattle(); 
-      else drawExploration();
-    };
-    
-    img.onerror = () => {
-      console.warn(`❌ Primary source failed for #${id}, trying fallback...`);
-      if (fallbackUrl && img.src !== fallbackUrl) {
-        img.src = fallbackUrl;
-      } else {
-        console.warn(`⚠️ Fallback also failed for #${id}, using placeholder`);
-        spriteCache[id] = createPlaceholderImage(id);
-        if (gameState && gameState.gameMode === 'battle') drawBattle();
-      }
-    };
-    
-    img.src = primaryUrl;
-  }
-  
-  loadWithFallback();
-  
-  // Return placeholder while loading
   return createPlaceholderImage(id);
 }
 
@@ -300,8 +281,8 @@ async function loadGame() {
     console.error('Load error:', error);
   }
 
-  console.log('📦 Preloading Pokemon sprites...');
-  pokemonBase.forEach(pok => loadSpriteImage(pok.id));
+  // Preload images in background
+  preloadPokemonImages();
 
   if (gameState.team.length === 0) startPokemonSelection(); else startExploration();
 }
@@ -384,10 +365,16 @@ function drawBattle() {
   ctx.fillStyle = '#A8D8A8'; ctx.fillRect(0, 0, canvas.width, 160);
   ctx.fillStyle = '#D4C9A8'; ctx.fillRect(180, 20, 120, 100); ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.strokeRect(180, 20, 120, 100);
 
-  // Enemy sprite - draw actual image if loaded
-  const enemySprite = spriteCache[enemy.id];
-  if (enemySprite && enemySprite.loaded && !enemySprite.isPlaceholder) {
-    try { ctx.drawImage(enemySprite, 180, 20, 120, 120); } catch (e) { console.warn('drawImage error', e); ctx.fillStyle = enemy.color; ctx.fillRect(220, 50, 60, 60); }
+  // Enemy sprite - draw actual image if available
+  const enemySprite = getSpriteImage(enemy.id);
+  if (enemySprite && enemySprite.loaded) {
+    try { 
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(enemySprite, 180, 20, 120, 120); 
+    } catch (e) { 
+      ctx.fillStyle = enemy.color; 
+      ctx.fillRect(220, 50, 60, 60); 
+    }
   } else { 
     ctx.fillStyle = enemy.color; 
     ctx.fillRect(220, 50, 60, 60);
@@ -399,9 +386,15 @@ function drawBattle() {
   ctx.fillStyle = '#FF0000'; ctx.fillRect(20, 50, 80, 8); ctx.fillStyle = '#00AA00'; const enemyHpPercent = Math.max(0, enemy.currentHp / enemy.maxHp); ctx.fillRect(20, 50, 80 * enemyHpPercent, 8);
 
   // Player sprite
-  const playerSprite = spriteCache[player.id];
-  if (playerSprite && playerSprite.loaded && !playerSprite.isPlaceholder) {
-    try { ctx.drawImage(playerSprite, 20, 150, 120, 120); } catch (e) { console.warn('drawImage error', e); ctx.fillStyle = player.color; ctx.fillRect(60, 205, 60, 60); }
+  const playerSprite = getSpriteImage(player.id);
+  if (playerSprite && playerSprite.loaded) {
+    try { 
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(playerSprite, 20, 150, 120, 120); 
+    } catch (e) { 
+      ctx.fillStyle = player.color; 
+      ctx.fillRect(60, 205, 60, 60); 
+    }
   } else { 
     ctx.fillStyle = player.color; 
     ctx.fillRect(60, 205, 60, 60);
