@@ -32,38 +32,57 @@ const pokemonBase = [
   { id: 102, name: 'Exeggcute', type: 'grass', hp: 60, atk: 40, def: 80, spa: 60, spd: 85, spe: 40, catchRate: 190, color: '#A8B820' }
 ];
 
-// Direct CDN URLs - fastest and most reliable
+// Use jsDelivr CDN - more reliable than GitHub raw
 const pokemonUrls = {
-  1: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/1.png',
-  4: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/4.png',
-  7: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/7.png',
-  25: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/25.png',
-  58: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/58.png',
-  63: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/63.png',
-  69: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/69.png',
-  133: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/133.png',
-  95: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/95.png',
-  102: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/102.png'
+  1: 'https://cdn.jsdelivr.net/gh/PokeAPI/sprites@2.0.2/pokemon/other/official-artwork/1.png',
+  4: 'https://cdn.jsdelivr.net/gh/PokeAPI/sprites@2.0.2/pokemon/other/official-artwork/4.png',
+  7: 'https://cdn.jsdelivr.net/gh/PokeAPI/sprites@2.0.2/pokemon/other/official-artwork/7.png',
+  25: 'https://cdn.jsdelivr.net/gh/PokeAPI/sprites@2.0.2/pokemon/other/official-artwork/25.png',
+  58: 'https://cdn.jsdelivr.net/gh/PokeAPI/sprites@2.0.2/pokemon/other/official-artwork/58.png',
+  63: 'https://cdn.jsdelivr.net/gh/PokeAPI/sprites@2.0.2/pokemon/other/official-artwork/63.png',
+  69: 'https://cdn.jsdelivr.net/gh/PokeAPI/sprites@2.0.2/pokemon/other/official-artwork/69.png',
+  133: 'https://cdn.jsdelivr.net/gh/PokeAPI/sprites@2.0.2/pokemon/other/official-artwork/133.png',
+  95: 'https://cdn.jsdelivr.net/gh/PokeAPI/sprites@2.0.2/pokemon/other/official-artwork/95.png',
+  102: 'https://cdn.jsdelivr.net/gh/PokeAPI/sprites@2.0.2/pokemon/other/official-artwork/102.png'
 };
 
 const spriteCache = {};
 
-// Fast image preloader - no placeholders
+// Preload with detailed logging
 function preloadAllPokemon() {
+  console.log('🎮 Starting Pokemon preload...');
   Object.keys(pokemonUrls).forEach(id => {
+    const url = pokemonUrls[id];
     const img = new Image();
-    img.src = pokemonUrls[id];
+    img.crossOrigin = 'anonymous';
+    
     img.onload = () => {
       spriteCache[id] = img;
-      console.log(`✅ #${id} ready`);
-      if (gameState && gameState.gameMode === 'battle') drawBattle();
+      console.log(`✅ #${id} loaded: ${img.width}x${img.height}`);
+      if (gameState && gameState.gameMode === 'battle') {
+        console.log('🎨 Redrawing battle...');
+        drawBattle();
+      }
     };
-    img.onerror = () => console.warn(`⚠️ #${id} failed`);
+    
+    img.onerror = () => {
+      console.error(`❌ FAILED: #${id} from ${url}`);
+      spriteCache[id] = null;
+    };
+    
+    console.log(`📥 Loading #${id}: ${url}`);
+    img.src = url;
   });
 }
 
 function getSpriteImage(id) {
-  return spriteCache[id] || null;
+  const img = spriteCache[id];
+  if (img) {
+    console.log(`🖼️ Drawing #${id} (${img.width}x${img.height})`);
+  } else {
+    console.warn(`⚠️ No image for #${id}`);
+  }
+  return img || null;
 }
 
 let gameState = {
@@ -244,7 +263,7 @@ async function loadGame() {
     console.error('Load error:', error);
   }
 
-  // Start preloading Pokemon immediately
+  console.log('🎮 Game loaded, preloading Pokemon...');
   preloadAllPokemon();
 
   if (gameState.team.length === 0) startPokemonSelection(); else startExploration();
@@ -319,6 +338,7 @@ function startRandomBattle() {
   battleState.playerPokemon = gameState.team[0];
   battleState.enemyPokemon = createPokemon(enemyBase, enemyLevel);
   battleState.battleType = 'wild'; battleState.battleLog = []; battleState.turn = 0; battleState.playerTurn = true;
+  console.log(`⚔️ Battle started! Player: #${battleState.playerPokemon.id} vs Enemy: #${battleState.enemyPokemon.id}`);
   drawBattle();
 }
 
@@ -328,15 +348,19 @@ function drawBattle() {
   ctx.fillStyle = '#A8D8A8'; ctx.fillRect(0, 0, canvas.width, 160);
   ctx.fillStyle = '#D4C9A8'; ctx.fillRect(180, 20, 120, 100); ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.strokeRect(180, 20, 120, 100);
 
-  // Enemy sprite - draw Pokemon directly
+  // Draw enemy Pokemon
   const enemySprite = getSpriteImage(enemy.id);
   if (enemySprite) {
     try { 
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(enemySprite, 180, 20, 120, 120); 
     } catch (e) { 
-      console.error('Enemy draw error:', e);
+      console.error('Failed to draw enemy:', e);
     }
+  } else {
+    // Fallback: show solid color while loading
+    ctx.fillStyle = enemy.color;
+    ctx.fillRect(180, 20, 120, 120);
   }
 
   ctx.fillStyle = '#F8F8D8'; ctx.fillRect(10, 20, 160, 60); ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.strokeRect(10, 20, 160, 60);
@@ -344,15 +368,19 @@ function drawBattle() {
   ctx.font = '12px monospace'; ctx.fillText('Lv' + enemy.level, 130, 42);
   ctx.fillStyle = '#FF0000'; ctx.fillRect(20, 50, 80, 8); ctx.fillStyle = '#00AA00'; const enemyHpPercent = Math.max(0, enemy.currentHp / enemy.maxHp); ctx.fillRect(20, 50, 80 * enemyHpPercent, 8);
 
-  // Player sprite
+  // Draw player Pokemon
   const playerSprite = getSpriteImage(player.id);
   if (playerSprite) {
     try { 
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(playerSprite, 20, 150, 120, 120); 
     } catch (e) { 
-      console.error('Player draw error:', e);
+      console.error('Failed to draw player:', e);
     }
+  } else {
+    // Fallback: show solid color while loading
+    ctx.fillStyle = player.color;
+    ctx.fillRect(20, 150, 120, 120);
   }
 
   ctx.fillStyle = '#F8F8D8'; ctx.fillRect(150, 170, 160, 100); ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.strokeRect(150, 170, 160, 100);
@@ -385,6 +413,7 @@ function playerAttack() {
   const player = battleState.playerPokemon; const enemy = battleState.enemyPokemon;
   const damage = calculateDamage(player, enemy);
   enemy.currentHp -= damage; battleState.battleLog.push(`${player.name} used Tackle! ${damage} damage!`);
+  drawBattle();
   if (enemy.currentHp <= 0) { endBattle(true); return; }
   battleState.playerTurn = false; setTimeout(() => enemyAttack(), 800);
 }
@@ -392,6 +421,7 @@ function playerAttack() {
 function enemyAttack() {
   const player = battleState.playerPokemon; const enemy = battleState.enemyPokemon; const damage = calculateDamage(enemy, player);
   player.currentHp -= damage; battleState.battleLog.push(`${enemy.name} used Tackle! ${damage} damage!`);
+  drawBattle();
   if (player.currentHp <= 0) { endBattle(false); return; }
   battleState.playerTurn = true; drawBattle();
 }
@@ -429,4 +459,5 @@ function handleKeyPress(e) {
   if (e.code === 'Enter') openMainMenu();
 }
 
+console.log('🎮 Pokemon Game initialized! Check console for loading logs.');
 setupAuth();
