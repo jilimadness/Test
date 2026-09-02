@@ -32,18 +32,18 @@ const pokemonBase = [
   { id: 102, name: 'Exeggcute', type: 'grass', hp: 60, atk: 40, def: 80, spa: 60, spd: 85, spe: 40, catchRate: 190, color: '#A8B820' }
 ];
 
-// High-quality official artwork from PokeAPI - using alternate CDN for better reliability
+// Multiple sprite URL sources with fallbacks
 const spriteUrls = {
-  1:   'https://unpkg.com/pokesprite@2.0.2/pokemon-gen8/pokemon/1.png',
-  4:   'https://unpkg.com/pokesprite@2.0.2/pokemon-gen8/pokemon/4.png',
-  7:   'https://unpkg.com/pokesprite@2.0.2/pokemon-gen8/pokemon/7.png',
-  25:  'https://unpkg.com/pokesprite@2.0.2/pokemon-gen8/pokemon/25.png',
-  58:  'https://unpkg.com/pokesprite@2.0.2/pokemon-gen8/pokemon/58.png',
-  63:  'https://unpkg.com/pokesprite@2.0.2/pokemon-gen8/pokemon/63.png',
-  69:  'https://unpkg.com/pokesprite@2.0.2/pokemon-gen8/pokemon/69.png',
-  133: 'https://unpkg.com/pokesprite@2.0.2/pokemon-gen8/pokemon/133.png',
-  95:  'https://unpkg.com/pokesprite@2.0.2/pokemon-gen8/pokemon/95.png',
-  102: 'https://unpkg.com/pokesprite@2.0.2/pokemon-gen8/pokemon/102.png'
+  1:   { official: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/1.png', fallback: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/1.png' },
+  4:   { official: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/4.png', fallback: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/4.png' },
+  7:   { official: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/7.png', fallback: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/7.png' },
+  25:  { official: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/25.png', fallback: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/25.png' },
+  58:  { official: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/58.png', fallback: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/58.png' },
+  63:  { official: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/63.png', fallback: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/63.png' },
+  69:  { official: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/69.png', fallback: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/69.png' },
+  133: { official: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/133.png', fallback: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/133.png' },
+  95:  { official: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/95.png', fallback: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/95.png' },
+  102: { official: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/other/official-artwork/102.png', fallback: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/pokemon/102.png' }
 };
 
 const spriteCache = {};
@@ -60,12 +60,12 @@ function createPlaceholderImage(id) {
   return img;
 }
 
-// Load sprite with proper image handling
+// Load sprite with proper image handling and multiple fallback sources
 function loadSpriteImage(id) {
   if (spriteCache[id]) return spriteCache[id];
   
-  const url = spriteUrls[id];
-  if (!url) {
+  const urls = spriteUrls[id];
+  if (!urls) {
     const placeholder = createPlaceholderImage(id);
     spriteCache[id] = placeholder;
     return placeholder;
@@ -74,26 +74,43 @@ function loadSpriteImage(id) {
   const img = new Image();
   img.crossOrigin = 'anonymous';
   img.loaded = false;
+  let currentUrlIndex = 0;
   
-  img.onload = () => {
-    img.loaded = true;
-    spriteCache[id] = img;
-    console.log('Image loaded:', id, img.width, img.height);
-    // Trigger redraw
-    if (animationId) cancelAnimationFrame(animationId);
-    animationId = requestAnimationFrame(() => {
-      if (gameState && gameState.gameMode === 'battle') drawBattle(); 
-      else drawExploration();
-    });
-  };
+  function tryLoadImage(urlsToTry) {
+    if (currentUrlIndex >= urlsToTry.length) {
+      // All URLs failed, use placeholder
+      spriteCache[id] = createPlaceholderImage(id);
+      console.log('All sprite URLs failed for Pokemon #' + id + ', using placeholder');
+      return;
+    }
+    
+    const url = urlsToTry[currentUrlIndex];
+    console.log('Loading sprite #' + id + ' from: ' + url);
+    
+    img.onload = () => {
+      img.loaded = true;
+      spriteCache[id] = img;
+      console.log('✓ Image loaded successfully:', id, img.width, img.height);
+      // Trigger redraw
+      if (animationId) cancelAnimationFrame(animationId);
+      animationId = requestAnimationFrame(() => {
+        if (gameState && gameState.gameMode === 'battle') drawBattle(); 
+        else drawExploration();
+      });
+    };
+    
+    img.onerror = () => {
+      console.warn('Sprite load failed for #' + id + ' from: ' + url);
+      currentUrlIndex++;
+      tryLoadImage(urlsToTry);
+    };
+    
+    img.src = url;
+  }
   
-  img.onerror = () => {
-    console.error('Image failed to load:', id, url);
-    spriteCache[id] = createPlaceholderImage(id);
-    if (gameState && gameState.gameMode === 'battle') drawBattle();
-  };
-  
-  img.src = url;
+  // Try URLs in order: official artwork first, then fallback
+  const urlsToTry = [urls.official, urls.fallback];
+  tryLoadImage(urlsToTry);
   
   // Return placeholder while loading
   return createPlaceholderImage(id);
@@ -360,22 +377,36 @@ function drawBattle() {
   ctx.fillStyle = '#A8D8A8'; ctx.fillRect(0, 0, canvas.width, 160);
   ctx.fillStyle = '#D4C9A8'; ctx.fillRect(180, 20, 120, 100); ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.strokeRect(180, 20, 120, 100);
 
-  // Enemy sprite
+  // Enemy sprite - draw actual image if loaded, otherwise use color box
   const enemySprite = spriteCache[enemy.id];
   if (enemySprite && enemySprite.loaded && !enemySprite.isPlaceholder) {
-    try { ctx.drawImage(enemySprite, 200, 35, 80, 80); } catch (e) { console.warn('drawImage enemy error', e); ctx.fillStyle = enemy.color; ctx.fillRect(220, 50, 60, 60); }
-  } else { ctx.fillStyle = enemy.color; ctx.fillRect(220, 50, 60, 60); }
+    try { ctx.drawImage(enemySprite, 180, 20, 120, 120); } catch (e) { console.warn('drawImage enemy error', e); ctx.fillStyle = enemy.color; ctx.fillRect(220, 50, 60, 60); }
+  } else { 
+    // Draw placeholder while loading
+    ctx.fillStyle = enemy.color; 
+    ctx.fillRect(220, 50, 60, 60);
+    ctx.fillStyle = '#FFF';
+    ctx.font = 'bold 10px monospace';
+    ctx.fillText('Loading', 230, 80);
+  }
 
   ctx.fillStyle = '#F8F8D8'; ctx.fillRect(10, 20, 160, 60); ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.strokeRect(10, 20, 160, 60);
   ctx.fillStyle = '#000'; ctx.font = 'bold 14px monospace'; ctx.fillText(enemy.name.toUpperCase(), 20, 42);
   ctx.font = '12px monospace'; ctx.fillText('Lv' + enemy.level, 130, 42);
   ctx.fillStyle = '#FF0000'; ctx.fillRect(20, 50, 80, 8); ctx.fillStyle = '#00AA00'; const enemyHpPercent = Math.max(0, enemy.currentHp / enemy.maxHp); ctx.fillRect(20, 50, 80 * enemyHpPercent, 8);
 
-  // Player sprite
+  // Player sprite - draw actual image if loaded
   const playerSprite = spriteCache[player.id];
   if (playerSprite && playerSprite.loaded && !playerSprite.isPlaceholder) {
-    try { ctx.drawImage(playerSprite, 40, 185, 80, 80); } catch (e) { console.warn('drawImage player error', e); ctx.fillStyle = player.color; ctx.fillRect(60, 205, 60, 60); }
-  } else { ctx.fillStyle = player.color; ctx.fillRect(60, 205, 60, 60); }
+    try { ctx.drawImage(playerSprite, 20, 150, 120, 120); } catch (e) { console.warn('drawImage player error', e); ctx.fillStyle = player.color; ctx.fillRect(60, 205, 60, 60); }
+  } else { 
+    // Draw placeholder while loading
+    ctx.fillStyle = player.color; 
+    ctx.fillRect(60, 205, 60, 60);
+    ctx.fillStyle = '#FFF';
+    ctx.font = 'bold 10px monospace';
+    ctx.fillText('Loading', 70, 235);
+  }
 
   ctx.fillStyle = '#F8F8D8'; ctx.fillRect(150, 170, 160, 100); ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.strokeRect(150, 170, 160, 100);
   ctx.fillStyle = '#000'; ctx.font = 'bold 14px monospace'; ctx.fillText(player.name.toUpperCase(), 160, 192);
@@ -420,7 +451,7 @@ function enemyAttack() {
 
 function useItemInBattle() {
   if (gameState.items.potion <= 0) { showError('No Potions!'); return; }
-  const heal = 20; battleState.playerPokemon.currentHp = Math.min(battleState.playerPokemon.maxHp, battleState.playerPokemon.currentHp + heal); gameState.items.potion--; battleState.battleLog.push('Used Potion!'); battleState.playerTurn = false; setTimeout(() => enemyAttack(), 800);
+  const heal = 20; battleState.playerPokemon.currentHp = Math.min(battleState.playerPokemon.maxHp, battleState.playerPokemon.currentHp + heal); gameState.items.potion--; battleState.battleLog.push('Used Potion!');
 }
 
 function runAway() {
@@ -437,7 +468,7 @@ function openMainMenu() { gameState.menuOpen = !gameState.menuOpen; if (gameStat
 
 function showItems() { let itemsText = 'ITEMS\n\nPokéballs: ' + gameState.items.pokeball + '\nGreat Balls: ' + gameState.items.greatball + '\nUltra Balls: ' + gameState.items.ultraball + '\nPotions: ' + gameState.items.potion + '\nSuper Potions: ' + gameState.items.superpotion; showError(itemsText); }
 
-function showTeam() { let teamText = 'YOUR TEAM\n\n'; if (gameState.team.length === 0) { teamText = 'No Pokémon!'; } else { gameState.team.forEach((pok, i) => { teamText += (i + 1) + '. ' + pok.name + ' (Lv' + pok.level + ') HP: ' + pok.currentHp + '/' + pok.maxHp + '\n'; }); } showError(teamText); }
+function showTeam() { let teamText = 'YOUR TEAM\n\n'; if (gameState.team.length === 0) { teamText = 'No Pokémon!'; } else { gameState.team.forEach((pok, i) => { teamText += (i + 1) + '. ' + pok.name + ' Lv' + pok.level + '\n'; }); } showError(teamText); }
 
 function handleButtonA() { if (gameState.gameMode === 'explore') startRandomBattle(); else if (gameState.gameMode === 'battle') playerAttack(); }
 function handleButtonB() { if (gameState.gameMode === 'battle') runAway(); }
